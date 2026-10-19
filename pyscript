@@ -1,0 +1,52 @@
+import tensorflow as tf
+import keras
+from keras import datasets, layers, models, regularizers, optimizers
+
+import tensorflow as tf
+from keras import datasets, layers, models, regularizers, optimizers
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+
+train_dataset= keras.utils.image_dataset_from_directory(
+    "dataset",
+    image_size=(28,28),
+    batch_size=32,
+    validation_split=0.2,
+    subset="training",
+    seed=123,
+     )
+
+
+
+normalization_layer = tf.keras.layers.Rescaling(1./255)
+
+def change_inputs(images, labels):
+  x = tf.image.resize(normalization_layer(images),[28, 28], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+  return x, x
+
+normalized_ds = train_dataset.map(change_inputs)
+
+input_img = tf.keras.Input(shape=(28, 28, 3))
+x = tf.keras.layers.Flatten()(input_img)
+x = tf.keras.layers.Dense(28 * 28 * 3, activation='relu')(x)
+output = tf.keras.layers.Reshape(target_shape=(28, 28 ,3))(x)
+autoencoder = tf.keras.Model(input_img, output)
+
+autoencoder.compile(optimizer='adam', loss='mse')
+
+history = autoencoder.fit(normalized_ds, epochs=2)
+
+class_names = ['NotRobin','Robin']
+
+plt.figure(figsize=(2,2))
+for i in range(10):
+    plt.subplot(5,5,i+1)
+    plt.xticks([])
+    plt.yticks([])
+    plt.grid(False)
+    plt.imshow()
+    # The CIFAR labels happen to be arrays, 
+    # which is why you need the extra index
+    plt.xlabel(class_names[i])
+plt.show()
