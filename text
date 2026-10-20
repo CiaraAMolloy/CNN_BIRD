@@ -1,0 +1,50 @@
+You must also Submit a Jupyter notebook with the code where:
+•	The book is named CS4287-Assign2-ID1-ID2-ID3
+o	Where IDs  are the student id numbers of the team members
+•	The first line in the book is a comment with names and ID numbers of the team members
+•	The second line in the book should be a comment stating if the code executes to the end without an error.
+•	The third line in the book should be a comment with a link to the third party source where you opted to reuse an existing implementation.
+
+•	Every critical line of code MUST be commented by YOU to demonstrate a deep understanding of that code. You can do this by referring back to sections in the pdf.
+
+# Layer 1
+model.add(Conv2D(96, kernel_size=(3,3), strides=(1,1), input_shape=(32,32,3), padding='same'))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2,2), strides=(2,2)))
+model.add(BatchNormalization())
+
+# Layer 2
+model.add(Conv2D(256, kernel_size=(3,3), strides=(1,1), padding='same'))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2,2), strides=(2,2)))
+model.add(BatchNormalization())
+
+# Layer 3
+model.add(Conv2D(384, kernel_size=(3,3), strides=(1,1), padding='same'))
+model.add(Activation('relu'))
+
+# Layer 4
+model.add(Conv2D(384, kernel_size=(3,3), strides=(1,1), padding='same'))
+model.add(Activation('relu'))
+
+# Layer 5
+model.add(Conv2D(256, kernel_size=(3,3), strides=(1,1), padding='same'))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2,2), strides=(2,2)))
+
+# Flatten
+model.add(Flatten())
+
+# Fully Connected Layer 1
+model.add(Dense(1024))
+model.add(Activation('relu'))
+model.add(Dropout(0.5))
+
+# Fully Connected Layer 2
+model.add(Dense(512))
+model.add(Activation('relu'))
+model.add(Dropout(0.5))
+
+# Output Layer
+model.add(Dense(10))
+model.add(Activation('softmax'))
