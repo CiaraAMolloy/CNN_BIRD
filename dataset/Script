@@ -1,4 +1,354 @@
+from matplotlib import pyplot as plt
+from PIL import Image
+import numpy as np
+import os
+from os import listdir
 
+
+
+class ConvLayer:
+
+    def __init__(self, num_filters=1, filter_size=3):
+
+        self.num_filters = num_filters
+        self.filter_size = filter_size
+
+        self.filters = (
+            np.random.randn(
+                num_filters,
+                filter_size,
+                filter_size
+            ) * 0.1
+        )
+
+    def forward(self, image):
+
+        self.image = image
+
+        h, w = image.shape
+        fs = self.filter_size
+
+        output = np.zeros(
+            (
+                self.num_filters,
+                h-fs+1,
+                w-fs+1
+            )
+        )
+
+        for f in range(self.num_filters):
+
+            for i in range(h-fs+1):
+                for j in range(w-fs+1):
+
+                    region = image[i:i+fs, j:j+fs]
+
+                    output[f, i, j] = np.sum(
+                        region * self.filters[f]
+                    )
+
+        return output
+
+    def backward(self, d_out, learning_rate):
+
+        fs = self.filter_size
+
+        d_filters = np.zeros_like(self.filters)
+
+        h, w = self.image.shape
+
+        for f in range(self.num_filters):
+
+            for i in range(h-fs+1):
+                for j in range(w-fs+1):
+
+                    region = self.image[
+                        i:i+fs,
+                        j:j+fs
+                    ]
+
+                    d_filters[f] += (
+                        d_out[f, i, j] * region
+                    )
+
+        self.filters -= learning_rate * d_filters
+
+
+class Flatten:
+
+    def forward(self, x):
+        self.shape = x.shape
+        return x.reshape(1, -1)
+
+    def backward(self, grad):
+        return grad.reshape(self.shape)
+
+
+class ReLU:
+
+    def forward(self, x):
+
+        self.input = x
+
+        return np.maximum(0, x)
+
+    def backward(self, grad):
+
+        return grad * (self.input > 0)
+
+
+class MaxPool:
+
+    def forward(self, x):
+
+        self.input = x
+
+        channels, h, w = x.shape
+
+        output = np.zeros(
+            (
+                channels,
+                h//2,
+                w//2
+            )
+        )
+
+        for c in range(channels):
+
+            for i in range(0, h, 2):
+                for j in range(0, w, 2):
+
+                    region = x[c, i:i+2, j:j+2]
+
+                    output[c, i//2, j//2] = np.max(region)
+
+        return output
+    
+    def backward(self, grad):
+
+        channels, h, w = self.input.shape
+
+        d_input = np.zeros_like(self.input)
+
+        for c in range(channels):
+            for i in range(0, h-1, 2):
+                for j in range(0, w-1, 2):
+
+                    region = self.input[c, i:i+2, j:j+2]
+
+                    max_pos = np.unravel_index(
+                        np.argmax(region),
+                        region.shape
+                    )
+
+                    d_input[
+                        c,
+                        i + max_pos[0],
+                        j + max_pos[1]
+                    ] = grad[c, i//2, j//2]
+
+        return d_input
+
+class Dense:
+
+    def __init__(self, input_size, output_size):
+
+        self.weights = (
+            np.random.randn(input_size, output_size)
+            * np.sqrt(2/input_size)
+        )
+
+        self.biases = np.zeros((1, output_size))
+
+    def forward(self, x):
+
+        self.input = x
+
+        return np.dot(x, self.weights) + self.biases
+
+    def backward(self, grad, lr):
+
+        dw = np.dot(self.input.T, grad)
+
+        db = np.sum(grad, axis=0, keepdims=True)
+
+        dx = np.dot(grad, self.weights.T)
+
+        self.weights -= lr * dw
+        self.biases -= lr * db
+
+        return dx
+
+
+class Sigmoid:
+
+    def forward(self, x):
+
+        self.output = 1/(1+np.exp(-x))
+
+        return self.output
+
+    def backward(self, grad):
+
+        return (
+            grad *
+            self.output *
+            (1-self.output)
+        )
+
+
+conv1 = ConvLayer(num_filters=8)
+conv2 = ConvLayer(num_filters=16)
+conv3 = ConvLayer(num_filters=32)
+
+relu1 = ReLU()
+relu2 = ReLU()
+relu3 = ReLU()
+
+pool1 = MaxPool()
+pool2 = MaxPool()
+
+flat = Flatten()
+
+dense1 = Dense(32 * 6 * 6, 64)
+dense2 = Dense(64, 1)
+
+sigmoid = Sigmoid()
+def forward(image):
+
+    # Add channel dimension
+    x = np.expand_dims(image, axis=0)
+
+    # Block 1
+    x = conv1.forward(x)
+    x = relu1.forward(x)
+    x = pool1.forward(x)
+
+    # Block 2
+    x = conv2.forward(x)
+    x = relu2.forward(x)
+    x = pool2.forward(x)
+
+    # Block 3
+    x = conv3.forward(x)
+    x = relu3.forward(x)
+
+    # Classifier
+    x = flat.forward(x)
+
+    x = dense1.forward(x)
+    x = np.maximum(0, x)
+
+    x = dense2.forward(x)
+
+    x = sigmoid.forward(x)
+
+    return x
+
+def loss(y_true, y_pred):
+
+    eps = 1e-7
+
+    return -(
+        y_true*np.log(y_pred+eps)
+        +
+        (1-y_true)*np.log(
+            1-y_pred+eps
+        )
+    )
+
+
+
+learning_rate = 0.01
+
+folder_dir = "dataset/NotRobin"
+
+training_data = []
+for images in os.listdir(folder_dir):
+    if (images.endswith(".jpg")):
+        img = Image.open(folder_dir+"/"+images)
+
+        img = img.convert("L")
+
+        img = img.resize((64,64))
+
+        image = np.array(img)/255.0
+        training_data.append((image, 0))
+
+folder_dir = "dataset/Robin"
+
+for images in os.listdir(folder_dir):
+    if (images.endswith(".jpg")):
+        img = Image.open(folder_dir+"/"+images)
+
+        img = img.convert("L")
+
+        img = img.resize((64,64))
+
+        image = np.array(img)/255.0
+        training_data.append((image, 1))
+
+
+loss_history=[]
+accuracy_history=[]
+
+
+
+for epoch in range(250):
+    total_loss = 0
+    correct = 0
+
+    np.random.shuffle(training_data)
+
+    for image, label in training_data:
+
+        y_true = np.array([[label]])
+
+        prediction = forward(image)
+
+        total_loss += loss(y_true, prediction)[0][0]
+
+        predicted_class = int(prediction[0][0] > 0.5)
+
+        if predicted_class == label:
+            correct += 1
+
+        grad = prediction - y_true
+
+
+        grad = sigmoid.backward(grad)
+
+        grad = dense1.backward(grad, learning_rate)
+
+        grad = flat.backward(grad)
+
+        grad = pool1.backward(grad)
+
+        grad = relu4.backward(grad)
+        grad = conv4.backward(grad, learning_rate)
+
+        grad = relu3.backward(grad)
+        grad = conv3.backward(grad, learning_rate)
+
+        grad = relu2.backward(grad)
+        grad = conv2.backward(grad, learning_rate)
+
+        grad = relu1.backward(grad)
+        grad = conv1.backward(grad, learning_rate)
+        accuracy=correct/len(training_data)
+        avg_loss=avg_loss = total_loss / len(training_data)
+        loss_history.append(avg_loss)
+        accuracy_history.append(accuracy)
+
+
+        
+    print(
+    f"Epoch {epoch:3d} "
+    f"Loss={total_loss:.4f} "
+    f"Accuracy={correct/len(training_data):.2%}"
+    )
+
+plt.plot(loss_history, accuracy_history, color="blue", marker="o", linestyle="-", label="Trend Line")
 
 
 
