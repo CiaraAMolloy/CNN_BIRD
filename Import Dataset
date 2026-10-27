@@ -1,0 +1,30 @@
+#Ellis Mullen - 21334498
+
+#Imported pandas for manipulating the CSV and requesting the images from the URLs
+#Imported requests for downloading the images from the URLs
+import pandas as pd
+import requests
+from pathlib import Path
+
+#Reading the CSV file containing the image URLs 
+df = pd.read_csv("not_robins.csv")
+
+#Creating a directory to save the downloaded images
+#Checking if the directory already exists and if not it will create it
+out_dir = Path("not_robin")
+out_dir.mkdir(exist_ok=True)
+
+#Iterating through the URLs and downloading the images then saving them to the created directory
+for i, url in enumerate(df["image_url"].dropna()):
+    try:
+        #Downloading image with timeout of 20 secs
+        img = requests.get(url, timeout=20)
+        #Saving the image to my directory with an number incrementing for each
+        with open(out_dir / f"not_robin_{i}.jpg", "wb") as f:
+            #writing the content of the image to file
+            f.write(img.content)
+
+        print(f"Downloaded {i}")
+    #If any image doesn't work it will tell me
+    except Exception as e:
+        print(f"Failed {i}: {e}")
