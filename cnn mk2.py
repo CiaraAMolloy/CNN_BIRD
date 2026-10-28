@@ -1,16 +1,10 @@
 
 import tensorflow as tf
-import keras
-from keras import datasets, layers, models, regularizers, optimizers
 
-import tensorflow as tf
-from keras import datasets, layers, models, regularizers, optimizers
+
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-import tensorflow as tf
-import keras
-from keras.models import Sequential
 
 train_ds = tf.keras.utils.image_dataset_from_directory(
   "dataset",
